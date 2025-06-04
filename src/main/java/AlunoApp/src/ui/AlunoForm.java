@@ -8,6 +8,7 @@ import AlunoApp.src.bean.Aluno;
 import AlunoApp.src.exception.MatriculaDuplicadaException;
 import AlunoApp.src.bean.AlunoDAO;
 import AlunoApp.src.bean.RemocaoAlunoDAO;
+import AlunoApp.src.bean.AlunoDAOHibernate;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -15,7 +16,6 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.*;
 import javax.swing.text.MaskFormatter;
-import java.text.ParseException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -36,6 +36,7 @@ public class AlunoForm extends javax.swing.JFrame {
     private List<Aluno> listaAlunos = new ArrayList<>();
     private final SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
     private static final String NOME_ARQUIVO = "ListagemAlunos.txt";
+    private AlunoDAOHibernate alunoDAOHibernate = new AlunoDAOHibernate();
 
     public AlunoForm() {
         // --- Configurações da Janela Principal ---
@@ -173,6 +174,20 @@ public class AlunoForm extends javax.swing.JFrame {
             TabelaAlunosDialog dialogTabela = new TabelaAlunosDialog(this, listaAlunos);
             dialogTabela.setVisible(true);
         });
+
+        // Teste de inicialização do Hibernate
+        try {
+            System.out.println("Tentando inicializar o Hibernate...");
+            org.hibernate.Session session = AlunoApp.src.util.HibernateUtil.getSessionFactory().openSession();
+            System.out.println("Sessão do Hibernate criada com sucesso!");
+            session.close();
+        } catch (Exception ex) {
+            System.err.println("ERRO AO INICIALIZAR HIBERNATE: " + ex.getMessage());
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, 
+                "Erro na conexão com o banco de dados: " + ex.getMessage(), 
+                "Erro de Banco de Dados", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private MaskFormatter criarMascara(String formato) {
@@ -230,15 +245,20 @@ public class AlunoForm extends javax.swing.JFrame {
             }
             verificarMatriculaDuplicada(txtMatricula.getText());
             Aluno novoAluno = criarAlunoPeloFormulario();
+            
+            // Salvar no banco de dados usando Hibernate
+            alunoDAOHibernate.salvar(novoAluno);
+            
+            // Adicionar à lista em memória (mantendo a funcionalidade existente)
             listaAlunos.add(novoAluno);
 
-            // ALTERADO: Mensagem de sucesso
-            JOptionPane.showMessageDialog(this, "Aluno " + novoAluno.getNome() + " adicionado com sucesso!", "Sucesso", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Aluno " + novoAluno.getNome() + " adicionado com sucesso no banco de dados e na lista!", "Sucesso", JOptionPane.INFORMATION_MESSAGE);
 
             limparCampos();
             salvarParaCSV();
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Erro ao adicionar aluno: " + ex.getMessage(), "Erro", JOptionPane.ERROR_MESSAGE);
+            ex.printStackTrace();
         }
     }
 
@@ -281,18 +301,23 @@ public class AlunoForm extends javax.swing.JFrame {
 
         // 2. Verificar se o aluno foi encontrado
         if (alunoParaRemover != null) {
-            // 3. Instanciar e usar o DAO para remover o aluno
-            AlunoDAO dao = new RemocaoAlunoDAO();
+            try {
+                // Remover do banco de dados
+                alunoDAOHibernate.excluir(alunoParaRemover);
+                
+                // 3. Instanciar e usar o DAO para remover o aluno da lista em memória
+                AlunoDAO dao = new RemocaoAlunoDAO();
+                this.listaAlunos = dao.removerAluno(this.listaAlunos, alunoParaRemover);
 
-            // 4. A lista principal da nossa classe é ATUALIZADA com a nova lista retornada pelo DAO
-            this.listaAlunos = dao.removerAluno(this.listaAlunos, alunoParaRemover);
+                // 4. Salvar a nova lista no arquivo CSV
+                salvarParaCSV();
 
-            // 5. Salvar a nova lista no arquivo CSV
-            salvarParaCSV();
-
-            // 6. Mostrar mensagem de sucesso
-            JOptionPane.showMessageDialog(this, "Aluno " + alunoParaRemover.getNome() + " removido com sucesso!", "Remoção Concluída", JOptionPane.INFORMATION_MESSAGE);
-
+                // 5. Mostrar mensagem de sucesso
+                JOptionPane.showMessageDialog(this, "Aluno " + alunoParaRemover.getNome() + " removido com sucesso do banco de dados e da lista!", "Remoção Concluída", JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Erro ao remover aluno do banco de dados: " + ex.getMessage(), "Erro", JOptionPane.ERROR_MESSAGE);
+                ex.printStackTrace();
+            }
         } else {
             // Mensagem caso o aluno não seja encontrado
             JOptionPane.showMessageDialog(this, "Aluno com matrícula '" + matricula + "' não encontrado para remoção.", "Não Encontrado", JOptionPane.WARNING_MESSAGE);
@@ -502,35 +527,34 @@ public class AlunoForm extends javax.swing.JFrame {
      * @param args the command line arguments
      */
     public static void main(String args[]) {
-        /* Set the Nimbus look and feel */
-        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
-        /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
-         * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
-         */
         try {
+            // Configurar o look and feel
             for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
                 if ("Nimbus".equals(info.getName())) {
                     javax.swing.UIManager.setLookAndFeel(info.getClassName());
                     break;
                 }
             }
-        } catch (ClassNotFoundException ex) {
-            java.util.logging.Logger.getLogger(AlunoForm.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (InstantiationException ex) {
-            java.util.logging.Logger.getLogger(AlunoForm.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (IllegalAccessException ex) {
-            java.util.logging.Logger.getLogger(AlunoForm.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (javax.swing.UnsupportedLookAndFeelException ex) {
-            java.util.logging.Logger.getLogger(AlunoForm.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+            
+            // Iniciar o aplicativo
+            java.awt.EventQueue.invokeLater(new Runnable() {
+                public void run() {
+                    try {
+                        System.out.println("Iniciando aplicativo...");
+                        new AlunoForm().setVisible(true);
+                    } catch (Exception e) {
+                        System.err.println("ERRO AO INICIAR APLICATIVO: " + e.getMessage());
+                        e.printStackTrace();
+                        JOptionPane.showMessageDialog(null, 
+                            "Erro ao iniciar o aplicativo: " + e.getMessage(), 
+                            "Erro Fatal", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            });
+        } catch (Exception ex) {
+            System.err.println("ERRO NA INICIALIZAÇÃO: " + ex.getMessage());
+            ex.printStackTrace();
         }
-        //</editor-fold>
-
-        /* Create and display the form */
-        java.awt.EventQueue.invokeLater(new Runnable() {
-            public void run() {
-                new AlunoForm().setVisible(true);
-            }
-        });
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables

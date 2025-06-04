@@ -4,16 +4,37 @@
  */
 package AlunoApp.src.bean;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Temporal;
+import jakarta.persistence.TemporalType;
 import java.util.Date;
 import java.text.SimpleDateFormat;
 
+@Entity
+@Table(name = "alunos")
 public class Aluno {
-
+    
+    @Id
+    @Column(name = "matricula")
     private String matricula;
+    
+    @Column(name = "nome", length = 100)
     private String nome;
+    
+    @Column(name = "idade")
     private int idade;
+    
+    @Temporal(TemporalType.DATE)
+    @Column(name = "data_nascimento")
     private Date dataNascimento;
+    
+    @Column(name = "telefone", length = 20)
     private String telefone;
+    
+    @Column(name = "cpf", length = 14)
     private String cpf;
 
     // Formato padrão para exibição da data
