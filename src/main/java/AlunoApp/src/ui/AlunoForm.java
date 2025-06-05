@@ -175,7 +175,6 @@ public class AlunoForm extends javax.swing.JFrame {
             dialogTabela.setVisible(true);
         });
 
-        // Teste de inicialização do Hibernate
         try {
             System.out.println("Tentando inicializar o Hibernate...");
             org.hibernate.Session session = AlunoApp.src.util.HibernateUtil.getSessionFactory().openSession();
@@ -194,7 +193,7 @@ public class AlunoForm extends javax.swing.JFrame {
         MaskFormatter formatter = null;
         try {
             formatter = new MaskFormatter(formato);
-            formatter.setPlaceholderCharacter('_'); // Caractere que aparece nos espaços vazios
+            formatter.setPlaceholderCharacter('_');
         } catch (ParseException e) {
             JOptionPane.showMessageDialog(null, "Erro ao criar a máscara de formatação: " + e.getMessage(), "Erro Interno", JOptionPane.ERROR_MESSAGE);
         }
@@ -302,8 +301,7 @@ public class AlunoForm extends javax.swing.JFrame {
         // 2. Verificar se o aluno foi encontrado
         if (alunoParaRemover != null) {
             try {
-                // Remover do banco de dados
-                alunoDAOHibernate.excluir(alunoParaRemover);
+                
                 
                 // 3. Instanciar e usar o DAO para remover o aluno da lista em memória
                 AlunoDAO dao = new RemocaoAlunoDAO();
@@ -313,14 +311,17 @@ public class AlunoForm extends javax.swing.JFrame {
                 salvarParaCSV();
 
                 // 5. Mostrar mensagem de sucesso
-                JOptionPane.showMessageDialog(this, "Aluno " + alunoParaRemover.getNome() + " removido com sucesso do banco de dados e da lista!", "Remoção Concluída", JOptionPane.INFORMATION_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Aluno " + alunoParaRemover.getNome() + " removido com sucesso da lista!", 
+                                             "Remoção Concluída", JOptionPane.INFORMATION_MESSAGE);
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Erro ao remover aluno do banco de dados: " + ex.getMessage(), "Erro", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Erro ao remover aluno: " + ex.getMessage(), 
+                                             "Erro", JOptionPane.ERROR_MESSAGE);
                 ex.printStackTrace();
             }
         } else {
             // Mensagem caso o aluno não seja encontrado
-            JOptionPane.showMessageDialog(this, "Aluno com matrícula '" + matricula + "' não encontrado para remoção.", "Não Encontrado", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Aluno com matrícula '" + matricula + "' não encontrado para remoção.", 
+                                         "Não Encontrado", JOptionPane.WARNING_MESSAGE);
         }
     }
 
