@@ -37,4 +37,13 @@ public class AlunoDAOHibernate {
             throw e;
         }
     }
+    
+    public Aluno buscarPorMatricula(String matricula) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            return session.get(Aluno.class, matricula);
+        } catch (Exception e) {
+            System.err.println("Erro ao buscar aluno: " + e.getMessage());
+            return null;
+        }
+    }
 }

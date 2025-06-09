@@ -37,6 +37,10 @@ public class AlunoForm extends javax.swing.JFrame {
     private final SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
     private static final String NOME_ARQUIVO = "ListagemAlunos.txt";
     private AlunoDAOHibernate alunoDAOHibernate = new AlunoDAOHibernate();
+    
+    // NOVA VARIÁVEL: Para controlar o modo de edição
+    private boolean modoEdicao = false;
+    private String matriculaEmEdicao = "";
 
     public AlunoForm() {
         // --- Configurações da Janela Principal ---
@@ -152,9 +156,13 @@ public class AlunoForm extends javax.swing.JFrame {
         btnInserirPosicao = new JButton("Inserir em Posição");
         btnListarTodos = new JButton("Listar Todos");
 
+        // NOVO BOTÃO
+        JButton btnAtualizar = new JButton("Atualizar Aluno");
+
         panelBotoes.add(btnAdicionar);
         panelBotoes.add(btnBuscar);
         panelBotoes.add(btnRemover);
+        panelBotoes.add(btnAtualizar); // Adicionar o novo botão
         panelBotoes.add(btnVerificarIdades);
         panelBotoes.add(btnInserirPosicao);
         panelBotoes.add(btnListarTodos);
@@ -164,6 +172,7 @@ public class AlunoForm extends javax.swing.JFrame {
         btnAdicionar.addActionListener(this::adicionarAluno);
         btnBuscar.addActionListener(this::buscarAluno);
         btnRemover.addActionListener(this::removerAluno);
+        btnAtualizar.addActionListener(this::atualizarAluno); // NOVA AÇÃO
         btnVerificarIdades.addActionListener(this::verificarIdades);
         btnInserirPosicao.addActionListener(this::inserirEmPosicao);
         btnListarTodos.addActionListener(e -> {
@@ -221,9 +230,26 @@ public class AlunoForm extends javax.swing.JFrame {
         try {
             String dataNascStr = txtDataNascimento.getText();
 
-            // AQUI ESTÁ A CORREÇÃO: trocamos .contains("") por .contains("_")
             if (dataNascStr != null && !dataNascStr.contains("_") && dataNascStr.length() == 10) {
                 Date dataNascimento = sdf.parse(dataNascStr);
+                
+                // NOVA VALIDAÇÃO: Verificar se a data não é futura
+                Date hoje = new Date();
+                if (dataNascimento.after(hoje)) {
+                    // Data de nascimento é futura
+                    JOptionPane.showMessageDialog(this, 
+                        "Erro: Data de nascimento não pode ser posterior à data atual!\n" +
+                        "Data informada: " + dataNascStr + "\n" +
+                        "Data atual: " + sdf.format(hoje), 
+                        "Data Inválida", 
+                        JOptionPane.ERROR_MESSAGE);
+                    
+                    // Limpar o campo de data e idade
+                    txtDataNascimento.setValue(null);
+                    txtIdadeCalculadaDisplay.setText("");
+                    return;
+                }
+                
                 int idade = calcularIdade(dataNascimento);
                 txtIdadeCalculadaDisplay.setText(String.valueOf(idade));
             } else {
@@ -233,35 +259,162 @@ public class AlunoForm extends javax.swing.JFrame {
         } catch (ParseException ex) {
             // Se a data for inválida (ex: 30/02/2020), limpa também
             txtIdadeCalculadaDisplay.setText("");
+            
+            // NOVA VALIDAÇÃO: Mostrar mensagem para datas inválidas
+            JOptionPane.showMessageDialog(this, 
+                "Erro: Data de nascimento inválida!\n" +
+                "Verifique se a data está no formato correto (dd/MM/yyyy) e se existe.\n" +
+                "Exemplo: 29/02 só existe em anos bissextos.", 
+                "Data Inválida", 
+                JOptionPane.ERROR_MESSAGE);
+            
+            // Limpar o campo
+            txtDataNascimento.setValue(null);
         }
     }
 
+    // MÉTODO CORRIGIDO: Atualizar aluno
+    private void atualizarAluno(ActionEvent e) {
+        String matricula = JOptionPane.showInputDialog(this, "Digite a matrícula do aluno a ser atualizado:");
+        if (matricula == null || matricula.trim().isEmpty()) {
+            return;
+        }
+
+        try {
+            // Buscar o aluno no banco de dados
+            Aluno alunoExistente = alunoDAOHibernate.buscarPorMatricula(matricula.trim());
+            
+            if (alunoExistente == null) {
+                JOptionPane.showMessageDialog(this, "Aluno com matrícula '" + matricula + "' não encontrado no banco de dados.", 
+                                             "Não Encontrado", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            // PRIMEIRA MODAL: Informar que o aluno foi encontrado
+            String mensagemEncontrado = String.format(
+                "Aluno encontrado:\n\n" +
+                "Matrícula: %s\n" +
+                "Nome: %s\n" +
+                "Data Nascimento: %s\n" +
+                "Telefone: %s\n" +
+                "CPF: %s\n\n" +
+                "Deseja prosseguir com a edição?",
+                alunoExistente.getMatricula(),
+                alunoExistente.getNome(),
+                alunoExistente.getDataNascimento() != null ? sdf.format(alunoExistente.getDataNascimento()) : "Não informado",
+                alunoExistente.getTelefone() != null ? alunoExistente.getTelefone() : "Não informado",
+                alunoExistente.getCpf() != null ? alunoExistente.getCpf() : "Não informado"
+            );
+            
+            int confirmarEdicao = JOptionPane.showConfirmDialog(this, 
+                                                              mensagemEncontrado,
+                                                              "Aluno Encontrado", 
+                                                              JOptionPane.YES_NO_OPTION,
+                                                              JOptionPane.INFORMATION_MESSAGE);
+            
+            if (confirmarEdicao != JOptionPane.YES_OPTION) {
+                return; // Usuário cancelou
+            }
+
+            // PREENCHER O FORMULÁRIO com os dados do aluno encontrado
+            txtMatricula.setText(alunoExistente.getMatricula());
+            txtMatricula.setEditable(false); // Não permitir editar a matrícula
+            txtNome.setText(alunoExistente.getNome());
+            if (alunoExistente.getDataNascimento() != null) {
+                txtDataNascimento.setText(sdf.format(alunoExistente.getDataNascimento()));
+            }
+            if (alunoExistente.getTelefone() != null) {
+                txtTelefone.setText(alunoExistente.getTelefone());
+            }
+            if (alunoExistente.getCpf() != null) {
+                txtCpf.setText(alunoExistente.getCpf());
+            }
+
+            // ATIVAR MODO DE EDIÇÃO
+            modoEdicao = true;
+            matriculaEmEdicao = matricula.trim();
+            
+            // Alterar textos dos botões
+            btnAdicionar.setText("Salvar Alterações");
+            btnBuscar.setText("Cancelar Edição");
+            
+            JOptionPane.showMessageDialog(this, 
+                "Os dados do aluno foram carregados nos campos acima.\n" +
+                "Edite as informações desejadas e clique em 'Salvar Alterações' para confirmar.\n" +
+                "Ou clique em 'Cancelar Edição' para cancelar.", 
+                "Modo de Edição", JOptionPane.INFORMATION_MESSAGE);
+            
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Erro ao buscar aluno: " + ex.getMessage(), 
+                                         "Erro", JOptionPane.ERROR_MESSAGE);
+            ex.printStackTrace();
+        }
+    }
+
+    // MÉTODO MODIFICADO: Adicionar aluno (agora também trata a atualização)
     private void adicionarAluno(ActionEvent e) {
         try {
             if (txtMatricula.getText().trim().isEmpty()) {
                 JOptionPane.showMessageDialog(this, "O campo matrícula é obrigatório.", "Erro de Validação", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            verificarMatriculaDuplicada(txtMatricula.getText());
-            Aluno novoAluno = criarAlunoPeloFormulario();
             
-            // Salvar no banco de dados usando Hibernate
-            alunoDAOHibernate.salvar(novoAluno);
+            if (modoEdicao) {
+                // MODO ATUALIZAÇÃO
+                Aluno alunoAtualizado = criarAlunoPeloFormulario();
+                
+                // Atualizar o aluno no banco usando Hibernate
+                alunoDAOHibernate.atualizar(alunoAtualizado);
+                
+                // Atualizar na lista em memória
+                for (int i = 0; i < listaAlunos.size(); i++) {
+                    if (listaAlunos.get(i).getMatricula().equals(matriculaEmEdicao)) {
+                        listaAlunos.set(i, alunoAtualizado);
+                        break;
+                    }
+                }
+                
+                // Atualizar o arquivo CSV
+                salvarParaCSV();
+                
+                JOptionPane.showMessageDialog(this, "Aluno atualizado com sucesso no banco de dados e no arquivo CSV!", 
+                                             "Sucesso", JOptionPane.INFORMATION_MESSAGE);
+                
+                // Sair do modo de edição
+                sairModoEdicao();
+                
+            } else {
+                // MODO NORMAL - ADICIONAR NOVO ALUNO
+                verificarMatriculaDuplicada(txtMatricula.getText());
+                Aluno novoAluno = criarAlunoPeloFormulario();
+                
+                // Salvar no banco de dados usando Hibernate
+                alunoDAOHibernate.salvar(novoAluno);
+                
+                // Adicionar à lista em memória
+                listaAlunos.add(novoAluno);
+
+                JOptionPane.showMessageDialog(this, "Aluno " + novoAluno.getNome() + " adicionado com sucesso no banco de dados e na lista!", "Sucesso", JOptionPane.INFORMATION_MESSAGE);
+
+                limparCampos();
+                salvarParaCSV();
+            }
             
-            // Adicionar à lista em memória (mantendo a funcionalidade existente)
-            listaAlunos.add(novoAluno);
-
-            JOptionPane.showMessageDialog(this, "Aluno " + novoAluno.getNome() + " adicionado com sucesso no banco de dados e na lista!", "Sucesso", JOptionPane.INFORMATION_MESSAGE);
-
-            limparCampos();
-            salvarParaCSV();
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Erro ao adicionar aluno: " + ex.getMessage(), "Erro", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Erro: " + ex.getMessage(), "Erro", JOptionPane.ERROR_MESSAGE);
             ex.printStackTrace();
         }
     }
 
+    // MÉTODO MODIFICADO: Buscar aluno (agora também trata o cancelar edição)
     private void buscarAluno(ActionEvent e) {
+        if (modoEdicao) {
+            // CANCELAR EDIÇÃO
+            sairModoEdicao();
+            return;
+        }
+        
+        // MODO NORMAL - BUSCAR ALUNO
         String matricula = JOptionPane.showInputDialog(this, "Digite a matrícula do aluno a ser buscado:");
         if (matricula == null || matricula.trim().isEmpty()) {
             return;
@@ -269,18 +422,30 @@ public class AlunoForm extends javax.swing.JFrame {
 
         for (Aluno aluno : listaAlunos) {
             if (aluno.getMatricula().equalsIgnoreCase(matricula.trim())) {
-                // ALTERADO: Exibe o resultado na tabela
                 List<Aluno> resultadoBusca = new ArrayList<>();
-                resultadoBusca.add(aluno); // Adiciona apenas o aluno encontrado à lista
+                resultadoBusca.add(aluno);
 
                 TabelaAlunosDialog dialog = new TabelaAlunosDialog(this, resultadoBusca);
                 dialog.setVisible(true);
-                return; // Encerra o método após encontrar
+                return;
             }
         }
 
-        // Se o loop terminar, o aluno não foi encontrado
         JOptionPane.showMessageDialog(this, "Aluno com matrícula '" + matricula + "' não encontrado.", "Não Encontrado", JOptionPane.WARNING_MESSAGE);
+    }
+
+    // NOVO MÉTODO: Sair do modo de edição
+    private void sairModoEdicao() {
+        modoEdicao = false;
+        matriculaEmEdicao = "";
+        
+        // Restaurar textos dos botões
+        btnAdicionar.setText("Adicionar");
+        btnBuscar.setText("Pesquisar Aluno");
+        
+        // Limpar campos e habilitar matrícula
+        limparCampos();
+        txtMatricula.setEditable(true);
     }
 
     private void removerAluno(ActionEvent e) {
@@ -405,14 +570,21 @@ public class AlunoForm extends javax.swing.JFrame {
         String dataNascStr = txtDataNascimento.getText();
         if (dataNascStr != null && !dataNascStr.contains("_") && dataNascStr.length() == 10) {
             dataNasc = sdf.parse(dataNascStr); // sdf.setLenient(false) já está no construtor
+            
+            Date hoje = new Date();
+            if (dataNasc.after(hoje)) {
+                throw new ParseException("Data de nascimento não pode ser posterior à data atual. " +
+                                   "Data informada: " + dataNascStr + 
+                                   ", Data atual: " + sdf.format(hoje), 0);
+            }
+            
             aluno.setDataNascimento(dataNasc);
-            aluno.setIdade(calcularIdade(dataNasc)); // MODIFICAÇÃO: Calcula e define a idade
+            aluno.setIdade(calcularIdade(dataNasc));
         } else {
-            // Esta exceção deve ser tratada no método que chama criarAlunoPeloFormulario (adicionarAluno)
             throw new ParseException("Data de nascimento incompleta ou inválida.", 0);
         }
 
-        aluno.setTelefone(txtTelefone.getText()); // JFormattedTextField retorna o valor com máscara
+        aluno.setTelefone(txtTelefone.getText());
         aluno.setCpf(txtCpf.getText());
         return aluno;
     }
@@ -560,4 +732,6 @@ public class AlunoForm extends javax.swing.JFrame {
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     // End of variables declaration//GEN-END:variables
-}
+
+   
+    }
