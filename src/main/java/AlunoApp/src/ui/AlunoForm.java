@@ -42,11 +42,14 @@ public class AlunoForm extends javax.swing.JFrame {
     private boolean modoEdicao = false;
     private String matriculaEmEdicao = "";
 
+    // VARIÁVEIS DE INSTÂNCIA: Adicione estas no início da classe
+    private JButton btnSalvarAlteracoes, btnCancelarEdicao;
+
     public AlunoForm() {
         // --- Configurações da Janela Principal ---
         setTitle("Cadastro de Alunos");
         setSize(600, 400);
-        setMinimumSize(new Dimension(800, 400));
+        setMinimumSize(new Dimension(900, 400));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
@@ -233,7 +236,6 @@ public class AlunoForm extends javax.swing.JFrame {
             if (dataNascStr != null && !dataNascStr.contains("_") && dataNascStr.length() == 10) {
                 Date dataNascimento = sdf.parse(dataNascStr);
                 
-                // NOVA VALIDAÇÃO: Verificar se a data não é futura
                 Date hoje = new Date();
                 if (dataNascimento.after(hoje)) {
                     // Data de nascimento é futura
@@ -318,7 +320,7 @@ public class AlunoForm extends javax.swing.JFrame {
 
             // PREENCHER O FORMULÁRIO com os dados do aluno encontrado
             txtMatricula.setText(alunoExistente.getMatricula());
-            txtMatricula.setEditable(false); // Não permitir editar a matrícula
+            txtMatricula.setEditable(false);
             txtNome.setText(alunoExistente.getNome());
             if (alunoExistente.getDataNascimento() != null) {
                 txtDataNascimento.setText(sdf.format(alunoExistente.getDataNascimento()));
@@ -330,18 +332,12 @@ public class AlunoForm extends javax.swing.JFrame {
                 txtCpf.setText(alunoExistente.getCpf());
             }
 
-            // ATIVAR MODO DE EDIÇÃO
-            modoEdicao = true;
-            matriculaEmEdicao = matricula.trim();
-            
-            // Alterar textos dos botões
-            btnAdicionar.setText("Salvar Alterações");
-            btnBuscar.setText("Cancelar Edição");
+            // ENTRAR NO MODO DE EDIÇÃO
+            entrarModoEdicao(matricula.trim());
             
             JOptionPane.showMessageDialog(this, 
                 "Os dados do aluno foram carregados nos campos acima.\n" +
-                "Edite as informações desejadas e clique em 'Salvar Alterações' para confirmar.\n" +
-                "Ou clique em 'Cancelar Edição' para cancelar.", 
+                "Edite as informações desejadas e clique em 'Salvar Alterações' para confirmar.", 
                 "Modo de Edição", JOptionPane.INFORMATION_MESSAGE);
             
         } catch (Exception ex) {
@@ -351,7 +347,132 @@ public class AlunoForm extends javax.swing.JFrame {
         }
     }
 
-    // MÉTODO MODIFICADO: Adicionar aluno (agora também trata a atualização)
+    // NOVO MÉTODO: Entrar no modo de edição
+    private void entrarModoEdicao(String matricula) {
+        modoEdicao = true;
+        matriculaEmEdicao = matricula;
+        
+        // OBTER O PAINEL DE BOTÕES
+        Container panelBotoes = btnAdicionar.getParent();
+        
+        // REMOVER TODOS OS BOTÕES
+        panelBotoes.removeAll();
+        
+        // CRIAR APENAS OS 2 BOTÕES DE EDIÇÃO
+        btnSalvarAlteracoes = new JButton("Salvar Alterações");
+        btnCancelarEdicao = new JButton("Cancelar");
+        
+        btnSalvarAlteracoes.addActionListener(this::salvarAlteracoes);
+        btnCancelarEdicao.addActionListener(this::cancelarEdicao);
+        
+        // ADICIONAR APENAS ESTES 2 BOTÕES
+        panelBotoes.add(btnSalvarAlteracoes);
+        panelBotoes.add(btnCancelarEdicao);
+        
+        // ATUALIZAR A INTERFACE
+        panelBotoes.revalidate();
+        panelBotoes.repaint();
+    }
+
+    // NOVO MÉTODO: Salvar alterações
+    private void salvarAlteracoes(ActionEvent e) {
+        try {
+            Aluno alunoAtualizado = criarAlunoPeloFormulario();
+            
+            // Atualizar no banco usando Hibernate
+            alunoDAOHibernate.atualizar(alunoAtualizado);
+            
+            // Atualizar na lista em memória
+            for (int i = 0; i < listaAlunos.size(); i++) {
+                if (listaAlunos.get(i).getMatricula().equals(matriculaEmEdicao)) {
+                    listaAlunos.set(i, alunoAtualizado);
+                    break;
+                }
+            }
+            
+            // Atualizar o arquivo CSV
+            salvarParaCSV();
+            
+            JOptionPane.showMessageDialog(this, "Aluno atualizado com sucesso!", 
+                                         "Sucesso", JOptionPane.INFORMATION_MESSAGE);
+            
+            // Sair do modo de edição
+            sairModoEdicao();
+            
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Erro ao atualizar aluno: " + ex.getMessage(), 
+                                         "Erro", JOptionPane.ERROR_MESSAGE);
+            ex.printStackTrace();
+        }
+    }
+
+    // NOVO MÉTODO: Cancelar edição
+    private void cancelarEdicao(ActionEvent e) {
+        int resposta = JOptionPane.showConfirmDialog(this, 
+            "Tem certeza que deseja cancelar a edição?\nTodas as alterações serão perdidas.", 
+            "Confirmar Cancelamento", 
+            JOptionPane.YES_NO_OPTION);
+        
+        if (resposta == JOptionPane.YES_OPTION) {
+            sairModoEdicao();
+        }
+    }
+
+    // MÉTODO MODIFICADO: Sair do modo de edição
+    private void sairModoEdicao() {
+        modoEdicao = false;
+        matriculaEmEdicao = "";
+        
+        // OBTER O PAINEL DE BOTÕES
+        Container panelBotoes = btnSalvarAlteracoes.getParent();
+        
+        // REMOVER OS BOTÕES DE EDIÇÃO
+        panelBotoes.removeAll();
+        
+        // RECRIAR TODOS OS BOTÕES ORIGINAIS
+        btnAdicionar = new JButton("Adicionar");
+        btnBuscar = new JButton("Pesquisar Aluno");
+        btnRemover = new JButton("Remover Aluno");
+        btnVerificarIdades = new JButton("Mais Novo/Velho");
+        btnInserirPosicao = new JButton("Inserir em Posição");
+        btnListarTodos = new JButton("Listar Todos");
+        JButton btnAtualizar = new JButton("Atualizar Aluno");
+        
+        // ADICIONAR TODOS OS BOTÕES DE VOLTA
+        panelBotoes.add(btnAdicionar);
+        panelBotoes.add(btnBuscar);
+        panelBotoes.add(btnRemover);
+        panelBotoes.add(btnAtualizar);
+        panelBotoes.add(btnVerificarIdades);
+        panelBotoes.add(btnInserirPosicao);
+        panelBotoes.add(btnListarTodos);
+        
+        // RESTAURAR TODAS AS AÇÕES
+        btnAdicionar.addActionListener(this::adicionarAluno);
+        btnBuscar.addActionListener(this::buscarAluno);
+        btnRemover.addActionListener(this::removerAluno);
+        btnAtualizar.addActionListener(this::atualizarAluno);
+        btnVerificarIdades.addActionListener(this::verificarIdades);
+        btnInserirPosicao.addActionListener(this::inserirEmPosicao);
+        btnListarTodos.addActionListener(e -> {
+            if (listaAlunos.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "A lista de alunos está vazia.", "Aviso", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+            TabelaAlunosDialog dialogTabela = new TabelaAlunosDialog(this, listaAlunos);
+            dialogTabela.setVisible(true);
+        });
+        
+        // Limpar campos e restaurar estado
+        limparCampos();
+        txtMatricula.setEditable(true);
+        
+        // ATUALIZAR A INTERFACE
+        panelBotoes.revalidate();
+        panelBotoes.repaint();
+    }
+
+    // SIMPLIFICAR OS MÉTODOS adicionarAluno E buscarAluno
     private void adicionarAluno(ActionEvent e) {
         try {
             if (txtMatricula.getText().trim().isEmpty()) {
@@ -359,46 +480,20 @@ public class AlunoForm extends javax.swing.JFrame {
                 return;
             }
             
-            if (modoEdicao) {
-                // MODO ATUALIZAÇÃO
-                Aluno alunoAtualizado = criarAlunoPeloFormulario();
-                
-                // Atualizar o aluno no banco usando Hibernate
-                alunoDAOHibernate.atualizar(alunoAtualizado);
-                
-                // Atualizar na lista em memória
-                for (int i = 0; i < listaAlunos.size(); i++) {
-                    if (listaAlunos.get(i).getMatricula().equals(matriculaEmEdicao)) {
-                        listaAlunos.set(i, alunoAtualizado);
-                        break;
-                    }
-                }
-                
-                // Atualizar o arquivo CSV
-                salvarParaCSV();
-                
-                JOptionPane.showMessageDialog(this, "Aluno atualizado com sucesso no banco de dados e no arquivo CSV!", 
-                                             "Sucesso", JOptionPane.INFORMATION_MESSAGE);
-                
-                // Sair do modo de edição
-                sairModoEdicao();
-                
-            } else {
-                // MODO NORMAL - ADICIONAR NOVO ALUNO
-                verificarMatriculaDuplicada(txtMatricula.getText());
-                Aluno novoAluno = criarAlunoPeloFormulario();
-                
-                // Salvar no banco de dados usando Hibernate
-                alunoDAOHibernate.salvar(novoAluno);
-                
-                // Adicionar à lista em memória
-                listaAlunos.add(novoAluno);
+            // MODO NORMAL - ADICIONAR NOVO ALUNO
+            verificarMatriculaDuplicada(txtMatricula.getText());
+            Aluno novoAluno = criarAlunoPeloFormulario();
+            
+            // Salvar no banco de dados usando Hibernate
+            alunoDAOHibernate.salvar(novoAluno);
+            
+            // Adicionar à lista em memória
+            listaAlunos.add(novoAluno);
 
-                JOptionPane.showMessageDialog(this, "Aluno " + novoAluno.getNome() + " adicionado com sucesso no banco de dados e na lista!", "Sucesso", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Aluno " + novoAluno.getNome() + " adicionado com sucesso!", "Sucesso", JOptionPane.INFORMATION_MESSAGE);
 
-                limparCampos();
-                salvarParaCSV();
-            }
+            limparCampos();
+            salvarParaCSV();
             
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Erro: " + ex.getMessage(), "Erro", JOptionPane.ERROR_MESSAGE);
@@ -406,14 +501,7 @@ public class AlunoForm extends javax.swing.JFrame {
         }
     }
 
-    // MÉTODO MODIFICADO: Buscar aluno (agora também trata o cancelar edição)
     private void buscarAluno(ActionEvent e) {
-        if (modoEdicao) {
-            // CANCELAR EDIÇÃO
-            sairModoEdicao();
-            return;
-        }
-        
         // MODO NORMAL - BUSCAR ALUNO
         String matricula = JOptionPane.showInputDialog(this, "Digite a matrícula do aluno a ser buscado:");
         if (matricula == null || matricula.trim().isEmpty()) {
@@ -433,21 +521,7 @@ public class AlunoForm extends javax.swing.JFrame {
 
         JOptionPane.showMessageDialog(this, "Aluno com matrícula '" + matricula + "' não encontrado.", "Não Encontrado", JOptionPane.WARNING_MESSAGE);
     }
-
-    // NOVO MÉTODO: Sair do modo de edição
-    private void sairModoEdicao() {
-        modoEdicao = false;
-        matriculaEmEdicao = "";
-        
-        // Restaurar textos dos botões
-        btnAdicionar.setText("Adicionar");
-        btnBuscar.setText("Pesquisar Aluno");
-        
-        // Limpar campos e habilitar matrícula
-        limparCampos();
-        txtMatricula.setEditable(true);
-    }
-
+    
     private void removerAluno(ActionEvent e) {
         String matricula = JOptionPane.showInputDialog(this, "Digite a matrícula do aluno a ser removido:");
         if (matricula == null || matricula.trim().isEmpty()) {
