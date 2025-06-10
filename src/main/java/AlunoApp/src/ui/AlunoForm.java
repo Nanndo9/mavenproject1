@@ -49,7 +49,7 @@ public class AlunoForm extends javax.swing.JFrame {
         // --- Configurações da Janela Principal ---
         setTitle("Cadastro de Alunos");
         setSize(600, 400);
-        setMinimumSize(new Dimension(800, 400));
+        setMinimumSize(new Dimension(900, 400));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
