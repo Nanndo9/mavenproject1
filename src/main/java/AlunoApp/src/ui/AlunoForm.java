@@ -52,6 +52,7 @@ public class AlunoForm extends javax.swing.JFrame {
         setMinimumSize(new Dimension(900, 400));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
+        setResizable(false);
         setLayout(new BorderLayout(10, 10));
 
         sdf.setLenient(false);
