@@ -1,29 +1,28 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
+
 package AlunoApp.src.bean;
 
-import AlunoApp.src.bean.Aluno;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Iterator;
 
 public class RemocaoAlunoDAO implements AlunoDAO {
 
     @Override
     public List<Aluno> removerAluno(List<Aluno> alunos, Aluno a) {
         if (alunos == null || a == null) {
-            return alunos; 
+            return alunos; // Retorna a lista original se algum parâmetro for nulo
         }
         
-        List<Aluno> novaLista = new ArrayList<>();
-        
-        for (Aluno alunoNaLista : alunos) {
-            if (!alunoNaLista.getMatricula().equals(a.getMatricula())) {
-                novaLista.add(alunoNaLista);
+        // Usar Iterator para remover com segurança da lista original
+        Iterator<Aluno> iterator = alunos.iterator();
+        while (iterator.hasNext()) {
+            Aluno alunoNaLista = iterator.next();
+            if (alunoNaLista.getMatricula().equals(a.getMatricula())) {
+                iterator.remove(); // Remove diretamente da lista original
+                break;
             }
         }
         
-        return novaLista; 
+        // Retorna a mesma lista, agora modificada
+        return alunos;
     }
 }
